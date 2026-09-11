@@ -1,0 +1,108 @@
+name: LUPA ad post-production
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  push:
+    paths:
+      - "queue/**.json"
+      - "bin/**"
+      - ".github/workflows/process.yml"
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "Process only this job_id (empty = all unprocessed)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lupa-postprod
+  cancel-in-progress: false
+
+env:
+  QUEUE_URL: https://lupaselect.com/pages/lupa-ad-queue-x7k2
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect jobs (Shopify queue page + repo queue/)
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ONLY: ${{ github.event.inputs.job_id }}
+        run: |
+          set -e
+          mkdir -p work/jobs
+          # 1) remote queue page -> individual job files
+          curl -sSL --retry 3 -A "lupa-ad-worker" "$QUEUE_URL" -o work/queue.html || true
+          python3 - <<'EOF'
+          import re, json, html, os
+          txt = open("work/queue.html", encoding="utf-8", errors="ignore").read() if os.path.exists("work/queue.html") else ""
+          m = re.search(r'id="lupa-queue"[^>]*>(.*?)</script>', txt, re.S)
+          jobs = []
+          if m:
+              try:
+                  jobs = json.loads(html.unescape(m.group(1)).strip()).get("jobs", [])
+              except Exception as e:
+                  print("queue page parse error:", e)
+          for j in jobs:
+              if "job_id" in j and j.get("beats"):
+                  json.dump(j, open(f"work/jobs/{j['job_id']}.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          print(f"remote queue jobs: {[j.get('job_id') for j in jobs]}")
+          EOF
+          # 2) repo queue/ (manual / bootstrap)
+          for f in queue/*.json; do [ -e "$f" ] && cp "$f" work/jobs/ || true; done
+          # 3) drop already-published (release exists) and filter ONLY
+          jobs=""
+          for f in work/jobs/*.json; do
+            [ -e "$f" ] || continue
+            id=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['job_id'])" "$f")
+            if [ -n "$ONLY" ] && [ "$ONLY" != "$id" ]; then continue; fi
+            if gh release view "job-$id" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "skip $id (release exists)"; continue
+            fi
+            jobs="$jobs $f"
+          done
+          echo "jobs=$jobs" >> "$GITHUB_OUTPUT"
+          echo "to process:$jobs"
+
+      - name: Install ffmpeg, Japanese font, TTS
+        if: steps.pick.outputs.jobs != ''
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk espeak-ng > /dev/null
+          pip install -q gtts
+
+      - name: Process and publish releases
+        if: steps.pick.outputs.jobs != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LUPA_TTS: gtts
+        run: |
+          set -e
+          for f in ${{ steps.pick.outputs.jobs }}; do
+            id=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['job_id'])" "$f")
+            out="out/$id"
+            echo "=== $id ==="
+            if python3 bin/process_job.py "$f" "$out" > "$id.log" 2>&1; then status=ok; else status=failed; tail -60 "$id.log"; fi
+            mp4=$(ls "$out"/*.mp4 2>/dev/null | head -1 || true)
+            assets="$id.log $f"
+            [ -n "$mp4" ] && assets="$assets $mp4 $out/result.json $out/frame1.jpg $out/frame2.jpg $out/frame3.jpg $out/frame4.jpg"
+            gh release create "job-$id" $assets --repo "$GITHUB_REPOSITORY" --title "$id ($status)" \
+              --notes "status: $status / run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "published release job-$id ($status)"
+          done
+
+      - name: Heartbeat (keeps the schedule alive)
+        if: steps.pick.outputs.jobs != ''
+        run: |
+          mkdir -p state && date -u > state/last_run.txt
+          git config user.name lupa-bot && git config user.email bot@lupaselect.com
+          git add state/last_run.txt && git commit -m "heartbeat" -q && git push -q || true
