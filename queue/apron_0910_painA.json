@@ -1,0 +1,70 @@
+{
+  "job_id": "apron_0910_painA",
+  "output_name": "apron_0910_painA_final.mp4",
+  "voice": "Kyoko",
+  "product": "キャット・エプロン（穴つき）",
+  "beats": [
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/apron_painA_beat0_raw.mp4?v=1789112442",
+      "captions": [
+        {
+          "text": "爪切り、また逃げられた…？",
+          "start": 0,
+          "end": 3,
+          "style": "pain"
+        }
+      ],
+      "narration": "爪切り、また逃げられた？"
+    },
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/apron_painA_beat1_raw.mp4?v=1789112442",
+      "captions": [
+        {
+          "text": "包むだけで、おとなしく",
+          "start": 0,
+          "end": 2.4
+        },
+        {
+          "text": "一人で爪切り完了",
+          "start": 2.4,
+          "end": 5
+        }
+      ],
+      "narration": "包むだけで落ち着いて、一人で爪切り完了。"
+    },
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/apron_painA_beat2_raw.mp4?v=1789112443",
+      "captions": [
+        {
+          "text": "ふわふわフリース素材",
+          "start": 0,
+          "end": 1.7
+        },
+        {
+          "text": "手足が出せる穴つき",
+          "start": 1.7,
+          "end": 3.4
+        },
+        {
+          "text": "紐で調整・両手が自由",
+          "start": 3.4,
+          "end": 5
+        }
+      ],
+      "narration": "ふわふわ素材、穴つき、両手が自由。"
+    },
+    {
+      "source": "endcard",
+      "duration": 2.5,
+      "captions": [
+        {
+          "text": "¥4,850・送料無料\n今すぐチェック",
+          "start": 0,
+          "end": 2.5,
+          "style": "cta"
+        }
+      ],
+      "narration": "送料無料、今すぐチェック。"
+    }
+  ]
+}
