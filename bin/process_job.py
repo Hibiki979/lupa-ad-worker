@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# LUPA AI creative post-production.
+# LUPA AI creative post-production (GitHub Actions worker). 2026-09-11: narration 1.5x + BGM bed.
 # Usage: process_job.py <job.json> <out_dir>
 #
 # job.json format:
@@ -7,6 +7,7 @@
 #   "job_id": "20260910_nekosuna_v2",
 #   "output_name": "nekosuna_mat_v2_final.mp4",
 #   "voice": "Kyoko",                 # optional, macOS `say` voice
+#   "bgm": "https://.../track.mp3",   # optional; default assets/bgm/default.mp3 if present
 #   "beats": [
 #     {"source": "https://.../clip1.mp4", "duration": null,
 #      "captions": [{"text": "...", "start": 0, "end": 3, "style": "pain"}],
@@ -123,18 +124,32 @@ def endcard_from(prev_video, dst, duration):
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", dst])
     return dst
 
-def narration_clip(text, voice, target_dur, workdir, idx):
+NARRATION_SPEED = float(os.environ.get("LUPA_NARRATION_SPEED", "1.5"))  # 2026-09-11: 1.5x by default (TTS is too slow at 1.0)
+
+def narration_clip(text, voice, target_dur, workdir, idx, speed=NARRATION_SPEED):
     backend, vname = voice
-    wav = synth(text, backend, vname, os.path.join(workdir, f"nar{idx}.wav"))
+    raw = synth(text, backend, vname, os.path.join(workdir, f"nar{idx}.wav"))
+    wav = os.path.join(workdir, f"nar{idx}_x{speed:.2f}.wav")
+    run(["ffmpeg", "-y", "-i", raw, "-filter:a", f"atempo={speed:.3f}", wav])
     d = ffprobe_duration(wav)
     limit = max(target_dur - 0.15, 0.5)
-    if d > limit:
+    if d > limit:  # still too long for the beat -> squeeze a little more (max +35%)
         tempo = min(d / limit, 1.35)
         fast = os.path.join(workdir, f"nar{idx}_fast.wav")
         run(["ffmpeg", "-y", "-i", wav, "-filter:a", f"atempo={tempo:.3f}", fast])
         wav = fast
-        print(f"narration {idx}: {d:.2f}s > {limit:.2f}s, atempo {tempo:.2f} -> {ffprobe_duration(wav):.2f}s")
+        print(f"narration {idx}: {d:.2f}s > {limit:.2f}s, extra atempo {tempo:.2f} -> {ffprobe_duration(wav):.2f}s")
     return wav
+
+def find_bgm(job, workdir):
+    """BGM source: job['bgm'] (URL or path) > assets/bgm/default.mp3 next to this repo > none."""
+    src = job.get("bgm")
+    if src and src.startswith("http"):
+        return download(src, os.path.join(workdir, "bgm_src"))
+    if src and os.path.exists(src):
+        return src
+    default = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "bgm", "default.mp3")
+    return default if os.path.exists(default) else None
 
 def esc_path(p):
     return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
@@ -221,21 +236,33 @@ def main():
     if total > t0:
         print(f"note: narration runs {total - t0:.2f}s past the video; extending last frame")
 
+    bgm = find_bgm(job, workdir)
+    bgm_gain = float(job.get("bgm_volume", os.environ.get("LUPA_BGM_VOLUME", "0.18")))  # ~-15 dB under the narration
+    print("bgm:", bgm or "none")
+
     cmd = ["ffmpeg", "-y", "-i", joined]
     for a in audio_inputs:
         cmd += ["-i", a]
+    if bgm:
+        cmd += ["-stream_loop", "-1", "-i", bgm]
     vchain = [f"tpad=stop_mode=clone:stop_duration={total - t0:.3f}"] if total > t0 + 0.01 else []
     vchain += filters
     fc = "[0:v]" + (",".join(vchain) if vchain else "null") + "[v]"
-    if audio_inputs:
-        parts = []
-        for k, d in enumerate(adelays):
-            fc += f";[{k+1}:a]adelay={d}|{d}[a{k}]"
-            parts.append(f"[a{k}]")
+    parts = []
+    for k, d in enumerate(adelays):
+        fc += f";[{k+1}:a]adelay={d}|{d}[a{k}]"
+        parts.append(f"[a{k}]")
+    if bgm:
+        bi = 1 + len(audio_inputs)
+        fc += (f";[{bi}:a]atrim=0:{total:.3f},asetpts=PTS-STARTPTS,volume={bgm_gain:.3f},"
+               f"afade=t=in:st=0:d=0.5,afade=t=out:st={max(total-1.0,0):.3f}:d=1.0[bg]")
+        parts.append("[bg]")
+    has_audio = bool(parts)
+    if has_audio:
         fc += f";{''.join(parts)}amix=inputs={len(parts)}:normalize=0,apad=whole_dur={total:.3f}[a]"
     final = os.path.join(out_dir, job.get("output_name", "final.mp4"))
     cmd += ["-filter_complex", fc, "-map", "[v]"]
-    if audio_inputs:
+    if has_audio:
         cmd += ["-map", "[a]", "-c:a", "aac", "-b:a", "160k"]
     cmd += ["-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
             "-pix_fmt", "yuv420p", "-r", str(FPS), "-movflags", "+faststart", final]
