@@ -1,0 +1,70 @@
+{
+  "job_id": "20260910_nekosuna_v2",
+  "output_name": "nekosuna_mat_v2_final.mp4",
+  "voice": "Kyoko",
+  "product": "二重構造ハニカム猫砂マット",
+  "beats": [
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/nekosuna_v2_beat0_raw.mp4?v=1789112403",
+      "captions": [
+        {
+          "text": "また今日も床が砂だらけ…？",
+          "start": 0,
+          "end": 3,
+          "style": "pain"
+        }
+      ],
+      "narration": "また今日も、床が砂だらけ？"
+    },
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/nekosuna_v2_beat1_raw.mp4?v=1789112403",
+      "captions": [
+        {
+          "text": "このマット1枚で解決",
+          "start": 0,
+          "end": 2.2
+        },
+        {
+          "text": "肉球についた砂を徹底キャッチ",
+          "start": 2.2,
+          "end": 5
+        }
+      ],
+      "narration": "このマット一枚で、肉球の砂を徹底キャッチ。"
+    },
+    {
+      "source": "https://cdn.shopify.com/s/files/1/0977/1470/0606/files/nekosuna_v2_beat2_raw.mp4?v=1789112403",
+      "captions": [
+        {
+          "text": "二重ハニカム構造",
+          "start": 0,
+          "end": 1.7
+        },
+        {
+          "text": "完全防水で床を守る",
+          "start": 1.7,
+          "end": 3.4
+        },
+        {
+          "text": "丸洗いOK・お手入れ簡単",
+          "start": 3.4,
+          "end": 5
+        }
+      ],
+      "narration": "二重ハニカム構造、完全防水、丸洗いOK。"
+    },
+    {
+      "source": "endcard",
+      "duration": 2.5,
+      "captions": [
+        {
+          "text": "¥3,200〜・送料無料\n今すぐチェック",
+          "start": 0,
+          "end": 2.5,
+          "style": "cta"
+        }
+      ],
+      "narration": "送料無料、今すぐチェック。"
+    }
+  ]
+}
