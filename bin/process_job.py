@@ -7,7 +7,7 @@
 #   "job_id": "20260910_nekosuna_v2",
 #   "output_name": "nekosuna_mat_v2_final.mp4",
 #   "voice": "Kyoko",                 # optional, macOS `say` voice
-#   "bgm": "https://.../track.mp3",   # optional; default assets/bgm/default.mp3 if present
+#   "bgm": "https://.../track.mp3",   # optional; default = first file in assets/bgm/ (default.* preferred)
 #   "beats": [
 #     {"source": "https://.../clip1.mp4", "duration": null,
 #      "captions": [{"text": "...", "start": 0, "end": 3, "style": "pain"}],
@@ -142,14 +142,15 @@ def narration_clip(text, voice, target_dur, workdir, idx, speed=NARRATION_SPEED)
     return wav
 
 def find_bgm(job, workdir):
-    """BGM source: job['bgm'] (URL or path) > assets/bgm/default.mp3 next to this repo > none."""
+    """BGM source: job['bgm'] (URL or path) > first track in assets/bgm/ (default.* preferred) > none."""
     src = job.get("bgm")
     if src and src.startswith("http"):
         return download(src, os.path.join(workdir, "bgm_src"))
     if src and os.path.exists(src):
         return src
-    default = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "bgm", "default.mp3")
-    return default if os.path.exists(default) else None
+    bgm_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "bgm")
+    cands = sorted(glob.glob(os.path.join(bgm_dir, "default.*")) or glob.glob(os.path.join(bgm_dir, "*.mp3")) + glob.glob(os.path.join(bgm_dir, "*.m4a")) + glob.glob(os.path.join(bgm_dir, "*.wav")))
+    return cands[0] if cands else None
 
 def esc_path(p):
     return p.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
